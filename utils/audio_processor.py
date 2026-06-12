@@ -1,9 +1,10 @@
 import yt_dlp
 import os
+import re
 import math
 from pydub import AudioSegment
 
-DOWNLOAD_DIR = 'downloades'
+DOWNLOAD_DIR = 'downloads'  # FIX: was 'downloades' (typo)
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
 
@@ -27,7 +28,13 @@ def extract_video_id(url: str) -> str:
     return None
 
 
-def get_youtube_captions(url: str) -> str:
+def get_youtube_captions(url: str, language: str = "english") -> str:
+    """
+    FIX: Now language-aware.
+    - english  → fetch English captions only
+    - hinglish → fetch Hindi captions (will be translated later by Sarvam
+                 during transcription, OR auto-translated captions if available)
+    """
     try:
         from youtube_transcript_api import YouTubeTranscriptApi
 
@@ -37,13 +44,18 @@ def get_youtube_captions(url: str) -> str:
 
         print(f"Fetching captions for video: {video_id}")
 
-        # New API style — works with 0.6.x
+        # FIX: choose caption languages based on selected transcription language
+        if language.lower() == "hinglish":
+            lang_priority = ['hi', 'hi-IN', 'en', 'en-US', 'en-GB']
+        else:
+            lang_priority = ['en', 'en-US', 'en-GB']
+
         try:
             data = YouTubeTranscriptApi.get_transcript(
-                video_id, languages=['en', 'en-US', 'en-GB']
+                video_id, languages=lang_priority
             )
             text = " ".join([t['text'] for t in data]).strip()
-            print(f"English captions found: {len(text.split())} words")
+            print(f"Captions found ({lang_priority[0]}): {len(text.split())} words")
             return text
         except Exception:
             pass
@@ -52,7 +64,7 @@ def get_youtube_captions(url: str) -> str:
         try:
             data = YouTubeTranscriptApi.get_transcript(video_id)
             text = " ".join([t['text'] for t in data]).strip()
-            print(f"Captions found: {len(text.split())} words")
+            print(f"Captions found (any language): {len(text.split())} words")
             return text
         except Exception as e:
             print(f"No captions: {e}")
@@ -68,20 +80,32 @@ def get_youtube_captions(url: str) -> str:
 # Downloads subtitle file directly, no audio needed
 # ─────────────────────────────────────────────────────
 
-def get_ytdlp_subtitles(url: str) -> str:
+def get_ytdlp_subtitles(url: str, language: str = "english") -> str:
     try:
         print("Trying yt-dlp subtitle extraction...")
         sub_dir = os.path.join(DOWNLOAD_DIR, "subs")
         os.makedirs(sub_dir, exist_ok=True)
 
+        # FIX: language-aware subtitle selection
+        if language.lower() == "hinglish":
+            sub_langs = ["hi", "hi-IN", "en", "en-US"]
+        else:
+            sub_langs = ["en", "en-US"]
+
         ydl_opts = {
             "writesubtitles": True,
             "writeautomaticsub": True,
-            "subtitleslangs": ["en", "en-US"],
+            "subtitleslangs": sub_langs,
             "subtitlesformat": "vtt",
             "skip_download": True,        # NO audio download
             "outtmpl": os.path.join(sub_dir, "%(id)s.%(ext)s"),
             "quiet": True,
+            # FIX: add a basic User-Agent — helps reduce some bot-check triggers
+            "http_headers": {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                               "AppleWebKit/537.36 (KHTML, like Gecko) "
+                               "Chrome/120.0.0.0 Safari/537.36",
+            },
         }
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -138,12 +162,46 @@ def parse_vtt(vtt_path: str) -> str:
 # For 3-5 hour videos: 3-8 minutes
 # ─────────────────────────────────────────────────────
 
+def _sanitize_filename(name: str) -> str:
+    """
+    FIX: Remove characters that break Windows file paths
+    (Hindi/Unicode titles often contain characters like : | " ? * < > /
+    which Windows rejects, causing 'No such file or directory' errors).
+    Keeps Unicode letters (Hindi/Devanagari) but strips path-breaking chars.
+    """
+    # Remove characters illegal in Windows filenames
+    name = re.sub(r'[<>:"/\\|?*\x00-\x1f]', '', name)
+    # Collapse multiple spaces
+    name = re.sub(r'\s+', ' ', name).strip()
+    # Limit length to avoid path-too-long errors
+    if len(name) > 150:
+        name = name[:150]
+    # Never allow empty filename
+    if not name:
+        name = "audio"
+    return name
+
+
 def download_youtube_audio(url: str) -> str:
-    """Download audio as 16kHz mono WAV to keep file size small."""
-    output_path = os.path.join(DOWNLOAD_DIR, "%(title)s.%(ext)s")
+    """
+    Download audio as 16kHz mono WAV to keep file size small.
+
+    FIX 1: Added cookies/user-agent + retry options to reduce
+           "Sign in to confirm you're not a bot" errors on certain
+           (often Hindi/regional) videos.
+    FIX 2: Sanitize the video title before use as filename — Hindi
+           titles often contain characters Windows can't handle,
+           which previously produced paths like
+           'downloades/Natural Language Processing.NA'
+           (broken extension + typo'd folder).
+    FIX 3: Build the final filename ourselves instead of trusting
+           yt_dlp's prepare_filename()+replace() chain, and verify
+           the file actually exists before returning it.
+    """
     ydl_opts = {
         "format": "bestaudio/best",
-        "outtmpl": output_path,
+        # Use video ID for outtmpl — avoids ALL unicode/special-char issues
+        "outtmpl": os.path.join(DOWNLOAD_DIR, "%(id)s.%(ext)s"),
         "postprocessors": [
             {
                 "key": "FFmpegExtractAudio",
@@ -152,12 +210,63 @@ def download_youtube_audio(url: str) -> str:
             }
         ],
         "quiet": True,
+        "noplaylist": True,
+        # FIX: realistic browser headers reduce bot-detection on many videos
+        "http_headers": {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                           "AppleWebKit/537.36 (KHTML, like Gecko) "
+                           "Chrome/120.0.0.0 Safari/537.36",
+            "Accept-Language": "en-US,en;q=0.9",
+        },
+        "retries": 5,
+        "fragment_retries": 5,
+        "socket_timeout": 30,
+        # FIX: extractor_args helps yt-dlp use a more reliable player client
+        # which is less likely to trigger "Sign in to confirm you're not a bot"
+        "extractor_args": {
+            "youtube": {
+                "player_client": ["android", "web"],
+            }
+        },
     }
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        info = ydl.extract_info(url, download=True)
-        filename = (ydl.prepare_filename(info)
-                    .replace(".webm", ".wav")
-                    .replace(".m4a", ".wav"))
+
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=True)
+            video_id = info.get("id")
+    except yt_dlp.utils.DownloadError as e:
+        err = str(e)
+        if "Sign in to confirm" in err or "bot" in err.lower():
+            # FIX: Retry once with a different player client as fallback
+            print("Bot-check triggered — retrying with alternate client...")
+            ydl_opts["extractor_args"] = {"youtube": {"player_client": ["tv_embedded", "android"]}}
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(url, download=True)
+                video_id = info.get("id")
+        else:
+            raise
+
+    # FIX: Build the expected output path ourselves using the video ID
+    # (guaranteed safe, no unicode/path issues) instead of trusting
+    # prepare_filename() with a title-based template.
+    expected_path = os.path.join(DOWNLOAD_DIR, f"{video_id}.wav")
+
+    # FIX: Verify the file actually exists. yt-dlp's postprocessor may have
+    # produced a slightly different extension in edge cases — search for it.
+    if not os.path.exists(expected_path):
+        found = None
+        for fname in os.listdir(DOWNLOAD_DIR):
+            if fname.startswith(video_id) and os.path.isfile(os.path.join(DOWNLOAD_DIR, fname)):
+                found = os.path.join(DOWNLOAD_DIR, fname)
+                break
+        if found is None:
+            raise FileNotFoundError(
+                f"Audio download failed — no output file found for video ID '{video_id}' "
+                f"in '{DOWNLOAD_DIR}'. The download may have been blocked."
+            )
+        expected_path = found
+
+    filename = expected_path
 
     # Re-export at 16kHz mono — reduces file by 4x
     print("Converting to 16kHz mono WAV...")
@@ -220,7 +329,7 @@ def chunk_audio(wav_path: str, chunk_minutes: int = 10) -> list:
 CAPTIONS_SENTINEL = "__CAPTIONS__"
 
 
-def process_input(source: str) -> list:
+def process_input(source: str, language: str = "english") -> list:
     """
     Smart 3-layer router:
 
@@ -231,12 +340,18 @@ def process_input(source: str) -> list:
 
     Uploaded file:
       Convert to WAV → chunk → Groq
+
+    FIX: `language` param now threaded through to caption layers so
+    Hindi/Hinglish videos correctly try Hindi captions first, and the
+    audio fallback path (Layer 3) is reached reliably for Hindi videos
+    that have no English captions (previously these often crashed
+    before reaching Layer 3 due to the bugs below).
     """
     is_url = source.startswith("http://") or source.startswith("https://")
 
     if is_url:
         # ── Layer 1: YouTube Transcript API ──────────────────
-        text = get_youtube_captions(source)
+        text = get_youtube_captions(source, language=language)
         if text and len(text.split()) > 100:
             caption_path = os.path.join(DOWNLOAD_DIR, "captions.txt")
             with open(caption_path, "w", encoding="utf-8") as f:
@@ -245,7 +360,7 @@ def process_input(source: str) -> list:
             return [CAPTIONS_SENTINEL + caption_path]
 
         # ── Layer 2: yt-dlp subtitles ─────────────────────────
-        text = get_ytdlp_subtitles(source)
+        text = get_ytdlp_subtitles(source, language=language)
         if text and len(text.split()) > 100:
             caption_path = os.path.join(DOWNLOAD_DIR, "captions.txt")
             with open(caption_path, "w", encoding="utf-8") as f:

@@ -1140,7 +1140,7 @@ elif st.session_state.processing:
             src = st.session_state.source
             lang = st.session_state.language
 
-            render(0); chunks = process_input(src)
+            render(0); chunks = process_input(src, language=lang)
             render(1); transcript = transcribe_all(chunks, language=lang)
             render(2); title = generate_title(transcript)
             render(3); summary = summarize(transcript)
