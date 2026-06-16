@@ -211,10 +211,12 @@ YouTube URL / Audio File
 <img width="1912" height="1011" alt="image" src="https://github.com/user-attachments/assets/23e793d9-400f-49ba-a975-6de58cf23c58" />
 
 ### Processing Screen
-Live step-by-step progress tracker showing each pipeline stage.
+<img width="1917" height="1017" alt="image" src="https://github.com/user-attachments/assets/5cb095a6-c814-4fbd-8873-32b39d0f9168" />
+
 
 ### Results Screen
-Two-panel layout — meeting summary on the left, tabbed insights (Summary, Transcript, Chat, Raw) on the right.
+<img width="1918" height="1012" alt="image" src="https://github.com/user-attachments/assets/4f60e0aa-0784-401e-b62d-9ea32fc2bae9" />
+
 
 ---
 
