@@ -1,43 +1,79 @@
-# MeetMind AI — Intelligent Meeting Analysis & RAG Assistant
+# 🎙️ MeetMind AI — Intelligent Meeting Analysis & RAG Assistant
 
-MeetMind AI is an AI-powered meeting assistant that transcribes audio recordings, generates concise summaries, and lets you ask questions about your meetings using a Retrieval-Augmented Generation (RAG) chatbot.
+> Transform any meeting recording or YouTube video into structured insights — summaries, action items, decisions, and an AI you can chat with.
 
-## Features
+---
 
-- **Audio Transcription** — Converts meeting recordings into text using Whisper.
-- **AI Summarization** — Generates concise meeting summaries and key points using LangChain.
-- **RAG-based Q&A** — Ask natural language questions about past meetings, powered by ChromaDB vector search.
-- **Interactive UI** — Simple Streamlit interface for uploading recordings, viewing summaries, and chatting with your meeting data.
+## ✨ What MeetMind AI Does
 
-## Tech Stack
+MeetMind AI takes a YouTube URL or uploaded audio/video file and automatically:
 
-- **Python**
-- **Whisper** — Speech-to-text transcription
-- **LangChain** — Summarization and RAG pipeline orchestration
-- **ChromaDB** — Vector database for embeddings storage and retrieval
-- **Sentence Transformers** — Embedding generation (all-MiniLM-L6-v2)
-- **Streamlit** — Web UI
-- **Groq / Gemini API** — LLM inference
+1. **Transcribes** the speech to text (English & Hinglish supported)
+2. **Generates** a professional meeting title
+3. **Summarizes** key topics and outcomes in bullet points
+4. **Extracts** action items, key decisions, and open questions
+5. **Builds** a RAG (Retrieval-Augmented Generation) knowledge base from the transcript
+6. **Lets you chat** with your meeting using natural language Q&A
 
-## Project Structure
+---
+
+## 🚀 Features
+
+| Feature | Description |
+|---|---|
+| 🎥 YouTube URL input | Paste any YouTube link — captions fetched in seconds |
+| 📁 File upload | Upload MP3, MP4, WAV, M4A, WEBM files |
+| 🌐 Multilingual | English and Hinglish → English transcription |
+| ⚡ Fast path | Uses YouTube captions when available (2-5 seconds) |
+| 🤖 AI summarization | Bullet-point summary via Groq/Mistral/Gemini |
+| ✅ Action items | Automatically extracted with owner and deadline |
+| 🔑 Key decisions | All major decisions listed |
+| ❓ Open questions | Unresolved topics flagged |
+| 💬 RAG chatbot | Ask anything about your meeting |
+| 📄 Export | Download results as TXT or PDF |
+| 🎨 Premium UI | Clean light-theme Streamlit interface |
+
+---
+
+## 🛠️ Tech Stack
+
+| Layer | Technology |
+|---|---|
+| **UI** | Streamlit |
+| **Audio download** | yt-dlp |
+| **Audio processing** | pydub |
+| **Transcription (English)** | Groq Whisper API |
+| **Transcription (Hinglish)** | Sarvam AI (saaras:v2.5) |
+| **Local transcription** | OpenAI Whisper (fallback) |
+| **Summarization / Extraction** | Groq LLaMA, Mistral, Gemini |
+| **Embeddings** | HuggingFace sentence-transformers (all-MiniLM-L6-v2) |
+| **Vector database** | ChromaDB |
+| **RAG pipeline** | LangChain |
+
+---
+
+## 📁 Project Structure
 
 ```
 MeetMind-AI/
 ├── core/
-│   ├── extractor.py        # Extracts text/audio content
-│   ├── transcriber.py       # Whisper-based transcription
-│   ├── sammarize.py          # Meeting summarization logic
-│   ├── rag_engine.py        # RAG pipeline and chatbot logic
-│   └── vector_store.py      # ChromaDB vector storage management
+│   ├── transcriber.py      # Multi-engine transcription (Groq, Sarvam, Whisper)
+│   ├── sammarize.py        # Title generation + summarization (Groq/Mistral/Gemini)
+│   ├── extractor.py        # Action items, decisions, questions extraction
+│   └── rag_engine.py       # ChromaDB vector store + RAG chat
 ├── utils/
-│   └── audio_processor.py   # Audio preprocessing utilities
-├── app.py                   # Streamlit application entry point
-├── main.py                  # Core pipeline runner
-├── requirements.txt         # Python dependencies
-
+│   └── audio_processor.py  # YouTube download, audio chunking, caption fetching
+├── app.py                  # Streamlit UI (main entry point)
+├── main.py                 # CLI pipeline runner
+├── requirements.txt        # Python dependencies
+├── .env                    # API keys (never committed)
+└── .streamlit/
+    └── config.toml         # Streamlit server config (disables file watcher noise)
 ```
 
-## Setup & Installation
+---
+
+## ⚙️ Setup & Installation
 
 ### 1. Clone the repository
 
@@ -49,9 +85,13 @@ cd MeetingMind-AI-Intelligent-Meeting-Analysis-RAG-Assistant
 ### 2. Create a virtual environment
 
 ```bash
+# Windows
 python -m venv .venv
-.venv\Scripts\activate      # Windows
-source .venv/bin/activate   # macOS/Linux
+.venv\Scripts\activate
+
+# macOS / Linux
+python -m venv .venv
+source .venv/bin/activate
 ```
 
 ### 3. Install dependencies
@@ -60,16 +100,34 @@ source .venv/bin/activate   # macOS/Linux
 pip install -r requirements.txt
 ```
 
+> **Note:** `ffmpeg` must also be installed on your system.
+> - Windows: `winget install ffmpeg`
+> - macOS: `brew install ffmpeg`
+> - Ubuntu: `sudo apt install ffmpeg`
+
 ### 4. Set up environment variables
 
-Create a `.env` file in the project root with your API keys:
+Create a `.env` file in the project root:
 
-```
-GROQ_API_KEY=your_groq_api_key_here
-GCP_API_KEY=your_gcp_api_key_here
+```env
+GROQ_API_KEY=your_groq_api_key
+GEMINI_API_KEY=your_gemini_api_key
+MISTRAL_API_KEY=your_mistral_api_key
+ASSEMBLYAI_API_KEY=your_assemblyai_api_key
+SARVAM_API_KEY=your_sarvam_api_key
+SARVAM_STT_MODEL=saaras:v2.5
+WHISPER_MODEL=small
 ```
 
-> **Note:** Never commit your `.env` file. It's already excluded via `.gitignore`.
+> ⚠️ Never commit your `.env` file. It is already excluded via `.gitignore`.
+
+**Get free API keys:**
+| API | Free Tier | Link |
+|---|---|---|
+| Groq | 100 req/day | [console.groq.com](https://console.groq.com) |
+| Mistral | Generous free tier | [console.mistral.ai](https://console.mistral.ai) |
+| Gemini | 60 req/min | [aistudio.google.com](https://aistudio.google.com) |
+| Sarvam | Free tier | [sarvam.ai](https://sarvam.ai) |
 
 ### 5. Run the application
 
@@ -77,27 +135,92 @@ GCP_API_KEY=your_gcp_api_key_here
 streamlit run app.py
 ```
 
-## First-Run Notes
+Open your browser at `http://localhost:8501`
 
-- On first run, the app will automatically download the `all-MiniLM-L6-v2` sentence-transformer model into a local `.embeddings_cache/` folder (~90 MB). This requires an internet connection.
-- A `vector_db/` folder will be created automatically by ChromaDB to store meeting embeddings locally.
-- Both `.embeddings_cache/` and `vector_db/` are gitignored and regenerate automatically — no manual setup needed.
+---
 
-## How It Works
+## 📖 How It Works (Step by Step)
 
-1. **Upload** a meeting audio recording.
-2. **Transcribe** — Whisper converts speech to text.
-3. **Summarize** — LangChain generates a structured summary with key points and action items.
-4. **Store** — Transcript embeddings are stored in ChromaDB.
-5. **Ask** — Query past meetings via the RAG chatbot for instant answers.
+```
+YouTube URL / Audio File
+        │
+        ▼
+┌─────────────────────────────────────────┐
+│         LAYER 1 — YouTube Captions      │  ← 2-5 seconds (fastest)
+│   YouTubeTranscriptApi.get_transcript() │
+└─────────────────────────────────────────┘
+        │ (if no captions)
+        ▼
+┌─────────────────────────────────────────┐
+│         LAYER 2 — yt-dlp Subtitles      │  ← 5-15 seconds
+│   Downloads .vtt subtitle file          │
+└─────────────────────────────────────────┘
+        │ (if no subtitles)
+        ▼
+┌─────────────────────────────────────────┐
+│         LAYER 3 — Audio Download        │  ← 1-5 minutes
+│   yt-dlp + Groq Whisper transcription   │
+└─────────────────────────────────────────┘
+        │
+        ▼
+┌─────────────────────────────────────────┐
+│           LLM PROCESSING                │
+│  Title → Summary → Actions →            │
+│  Decisions → Questions                  │
+│  (Groq → Mistral → Gemini fallback)     │
+└─────────────────────────────────────────┘
+        │
+        ▼
+┌─────────────────────────────────────────┐
+│           RAG PIPELINE                  │
+│  ChromaDB vector store built            │
+│  HuggingFace embeddings generated       │
+└─────────────────────────────────────────┘
+        │
+        ▼
+    Results shown in browser
+    (Summary, Actions, Decisions, Chat)
+```
 
-## Future Improvements
+---
 
-- Speaker diarization for multi-participant meetings
-- Export summaries as PDF/Word documents
-- Support for live meeting transcription
+## 🌐 Language Support
 
-## Author
+| Input Language | Transcription Engine | Output Language |
+|---|---|---|
+| English | Groq Whisper | English |
+| Hindi / Hinglish | Sarvam AI (saaras:v2.5) | English |
+
+---
+
+## ⏱️ Expected Processing Times
+
+| Video Length | With Captions | Without Captions |
+|---|---|---|
+| 15 seconds | ~10 sec | ~45 sec |
+| 5 minutes | ~15 sec | ~1-2 min |
+| 30 minutes | ~20 sec | ~3-5 min |
+| 1 hour | ~25 sec | ~5-8 min |
+| 3 hours | ~30 sec | ~15-20 min |
+
+---
+
+## 🖥️ Screenshots
+
+### Home Screen
+<img width="1912" height="1011" alt="image" src="https://github.com/user-attachments/assets/23e793d9-400f-49ba-a975-6de58cf23c58" />
+
+### Processing Screen
+Live step-by-step progress tracker showing each pipeline stage.
+
+### Results Screen
+Two-panel layout — meeting summary on the left, tabbed insights (Summary, Transcript, Chat, Raw) on the right.
+
+---
+
+## 👩‍💻 Author
 
 **Sakshi Jadhav**
-[Portfolio](https://sakshi-portfolio-eozi.vercel.app/)
+B.Sc. Artificial Intelligence
+
+---
